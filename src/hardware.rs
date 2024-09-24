@@ -1,3 +1,5 @@
+use std::u32;
+
 use crate::opcodes::*;
 
 
@@ -122,6 +124,17 @@ impl CPU {
         let data = mem.data[self.SP as usize];
         *cycles -= 1;
         self.SP = ((self.SP + 1) & 0xFF) | 0x100;
+        *cycles -= 1;
+        data
+    }
+
+    pub fn dec_u8(&self, data: u8, cycles: &mut u32) -> u8 {
+        let data = (((data as u16 | 0x100) - 1) & 0xFF) as u8;
+        *cycles -= 1;
+        data
+    }
+    pub fn inc_u8(&self, data: u8, cycles: &mut u32) -> u8 {
+        let data = (((data as u16 | 0x100) + 1) & 0xFF) as u8;
         *cycles -= 1;
         data
     }
@@ -398,11 +411,34 @@ impl CPU {
                 }
                 
                 // Dec
-                    DEC_ZP => todo!(), DEC_ZPX => todo!(),
-                    DEC_A  => todo!(), DEC_AX  => todo!(),
+                    DEC_ZP => {
+                        let zp_address = self.fetch_byte(cycles, mem);
+                        let value = self.read_byte(zp_address as u16, cycles, mem);
+                        mem.data[zp_address as usize] = self.dec_u8(value, cycles);
+                    }
+                    DEC_ZPX => {
+                        let mut zero_page_address = self.fetch_byte(cycles, mem);
+                        zero_page_address = ((zero_page_address as usize + self.X as usize) % 0xFFFF) as u8;
+                        *cycles -= 1;
+                        let value = self.read_byte(zero_page_address as u16, cycles, mem);
+                        mem.data[zero_page_address as usize] = self.dec_u8(value, cycles);
+                    }
+                    DEC_A  => {
+                        let address = self.fetch_word(cycles, mem);
+                        let absolute_address = self.read_word(address, cycles, mem);
+                        let value = self.read_byte(absolute_address, cycles, mem);
+                        mem.data[absolute_address as usize] = self.dec_u8(value, cycles);
+                    } 
+                    DEC_AX  => {
+                        let address = self.fetch_word(cycles, mem);
+                        let absolute_address = self.read_word(address, cycles, mem);
+                        let absolute_address_x = ((absolute_address as u32 + self.X as u32) & 0xFFFF) as u16;
+                        let value = self.read_byte(absolute_address_x, cycles, mem);
+                        mem.data[absolute_address_x as usize] = self.dec_u8(value, cycles);
+                    }
                 
-                DEX => todo!(),
-                DEY => todo!(),
+                DEX => self.X = self.dec_u8(self.X, cycles),
+                DEY => self.Y = self.dec_u8(self.Y, cycles),
                 
                 // EOR
                     EOR_IM =>  todo!(), EOR_ZP => todo!(),
